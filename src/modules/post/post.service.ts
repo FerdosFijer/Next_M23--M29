@@ -138,6 +138,131 @@ const getPostById = async (postId: string) => {
     })
     return result
 }
+const getMyPosts = async (authorId: string) => {
+    const userInfo = await prisma.user.findUnique({
+        where: {
+            id: authorId,
+            status: "ACTIVE"
+        },
+        select: {
+            id: true,
+            status: true
+        }
+    })
+    const result = await prisma.post.findMany({
+        where: {
+            authorId
+        },
+        orderBy: {
+            createdAt: "desc"
+        },
+        include: {
+            _count: {
+                select: {
+                    comments: true
+                }
+            }
+        }
+    });
+    // const total = await prisma.post.count({
+    //     where: {
+    //         authorId
+    //     }
+    // })
+    const total = await prisma.post.aggregate({
+        _count: {
+            id: true
+        },
+        where: {
+            authorId
+        }
+    })
+    return {
+        data: result,
+        total
+    };
+}
+
+/* 
+user sudu nijer post update korte parbe and isFeatured update korte parbe na
+admin sobar post update kore parbe
+*/
+const updateMyPosts = async (postId: string, data: Partial<Post>, authorId: string, isAdmin: boolean) => {
+    // console.log(postId, data, authorId);
+    const postData = await prisma.post.findUniqueOrThrow({
+        where: {
+            id: postId
+        },
+        select: {
+            id: true,
+            authorId: true
+        }
+    })
+
+    if (!isAdmin && (postData.authorId !== authorId)) {
+        throw new Error("you are not the owner of the post")
+    }
+    if (!isAdmin) {
+        delete data.isFeatured
+    }
+    const result = await prisma.post.update({
+        where: {
+            id: postData.id
+        },
+        data
+    })
+    return result;
+}
+
+/* 
+user nijer post delete korte parbe and admin sobar post delete korte parbe
+*/
+const deletePost = async (postId: string, authorId: string, isAdmin: boolean) => {
+    const postData = await prisma.post.findUniqueOrThrow({
+        where: {
+            id: postId
+        },
+        select: {
+            id: true,
+            authorId: true
+        }
+    })
+    if (!isAdmin && (postData.authorId !== authorId)) {
+        throw new Error("you are not the owner of the post")
+    }
+    return await prisma.post.delete({
+        where: {
+            id: postId
+        }
+    })
+}
+
+
+
+const getStats = async () => {
+    // post count, published posts, draft post, total comments, total views
+    return await prisma.$transaction(async (prismatx) => {
+        const [totalPosts, publishedPosts, draftPosts, archivedPosts, totalComments, approvedComment, rejectComment, totalUsers, adminCount, userCount, totalViews] = await Promise.all([
+            await prismatx.post.count(),
+            await prismatx.post.count({ where: { status: PostStatus.PUBLISHED } }),
+            await prismatx.post.count({ where: { status: PostStatus.DRAFT } }),
+            await prismatx.post.count({ where: { status: PostStatus.ARCHIVED } }),
+            await prismatx.comment.count(),
+            await prismatx.comment.count({ where: { status: CommentStatus.APPROVED } }),
+            await prismatx.comment.count({ where: { status: CommentStatus.REJECT } }),
+            await prismatx.user.count(),
+            await prismatx.user.count({ where: { role: "ADMIN" } }),
+            await prismatx.user.count({ where: { role: "USER" } }),
+            await prismatx.post.aggregate({ _sum: { views: true } })
+        ])
+
+        return {
+            totalPosts, publishedPosts, draftPosts, archivedPosts, totalComments, approvedComment, rejectComment, totalUsers, adminCount, userCount, totalViews: totalViews._sum.views
+        }
+    })
+}
+
+
 export const postServices = {
-    createPost, getAllPost, getPostById
+    createPost, getAllPost, getPostById, getMyPosts, updateMyPosts, deletePost, getStats
 }
