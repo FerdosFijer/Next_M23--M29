@@ -12,9 +12,10 @@ const createPost = async (data: Omit<Post, 'id' | 'createdAt' | 'updatedAt' | 'a
 }
 const getAllPost = async ({ search, tags, isFeatured, status, authorId, page, limit, skip, sortBy, sortOrder }:
     { search: string | undefined, tags: string[] | [], isFeatured: boolean | undefined, status: PostStatus | undefined, authorId: string | undefined, page: number, limit: number, skip: number, sortBy: string, sortOrder: string }) => {
-    const adnConditions: PostWhereInput[] = []
+    // console.log("get all post");
+    const andConditions: PostWhereInput[] = []
     if (search) {
-        adnConditions.push({
+        andConditions.push({
             OR: [
                 {
                     title: {
@@ -37,33 +38,33 @@ const getAllPost = async ({ search, tags, isFeatured, status, authorId, page, li
         })
     }
     if (tags.length > 0) {
-        adnConditions.push({
+        andConditions.push({
             tags: {
                 hasEvery: tags as string[]
             }
         })
     }
     if (typeof isFeatured === 'boolean') {
-        adnConditions.push({
+        andConditions.push({
             isFeatured
         })
     }
     if (status) {
-        adnConditions.push({
+        andConditions.push({
             status
         })
     }
     if (authorId) {
-        adnConditions.push({
+        andConditions.push({
             authorId
         })
     }
     const allPost = await prisma.post.findMany({
+        where: {
+            AND: andConditions
+        },
         take: limit,
         skip,
-        where: {
-            AND: adnConditions
-        },
         orderBy: {
             [sortBy]: sortOrder
         },
@@ -75,22 +76,19 @@ const getAllPost = async ({ search, tags, isFeatured, status, authorId, page, li
     });
     const total = await prisma.post.count({
         where: {
-            AND: adnConditions
+            AND: andConditions
         }
     })
     return {
         data: allPost,
         pagination: {
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit)
+            total, page, limit, totalPages: Math.ceil(total / limit)
         }
     };
 }
 const getPostById = async (postId: string) => {
-    const result = await prisma.$transaction(async (prisma) => {
-        await prisma.post.update({
+    const result = await prisma.$transaction(async (prisma) => {  //! transaction use kortesi jno return tkne korbe jkne update and findquique 2tai kaj hoye result dibe
+        await prisma.post.update({  //! view 1 kore increment kortesi and update kore dekassi file ta
             where: {
                 id: postId
             },
@@ -100,7 +98,7 @@ const getPostById = async (postId: string) => {
                 }
             }
         })
-        const postData = await prisma.post.findUnique({
+        const postData = await prisma.post.findUnique({  //! find kortesi one post by one id and show kortesi comment gulo and ordering kortesi asc or desc te
             where: {
                 id: postId
             },
@@ -139,7 +137,9 @@ const getPostById = async (postId: string) => {
     return result
 }
 const getMyPosts = async (authorId: string) => {
-    const userInfo = await prisma.user.findUnique({
+
+    //! user er status active takle sudu dekabe data nahole dekhabe ne myposts gulo
+    const userInfo = await prisma.user.findUniqueOrThrow({
         where: {
             id: authorId,
             status: "ACTIVE"
@@ -156,7 +156,7 @@ const getMyPosts = async (authorId: string) => {
         orderBy: {
             createdAt: "desc"
         },
-        include: {
+        include: {              //! count kortese kotogulo comment ache and add/include kore nisse table e
             _count: {
                 select: {
                     comments: true
@@ -169,6 +169,8 @@ const getMyPosts = async (authorId: string) => {
     //         authorId
     //     }
     // })
+
+    //! uporer 4 line k aggregate koreo count kora and likha jay
     const total = await prisma.post.aggregate({
         _count: {
             id: true
@@ -182,7 +184,6 @@ const getMyPosts = async (authorId: string) => {
         total
     };
 }
-
 /* 
 user sudu nijer post update korte parbe and isFeatured update korte parbe na
 admin sobar post update kore parbe
@@ -199,10 +200,10 @@ const updateMyPosts = async (postId: string, data: Partial<Post>, authorId: stri
         }
     })
 
-    if (!isAdmin && (postData.authorId !== authorId)) {
+    if (!isAdmin && (postData.authorId !== authorId)) {   //!admin sobar post update kore parbe
         throw new Error("you are not the owner of the post")
     }
-    if (!isAdmin) {
+    if (!isAdmin) {     //! isFeatured update korte parbe na
         delete data.isFeatured
     }
     const result = await prisma.post.update({
@@ -213,7 +214,6 @@ const updateMyPosts = async (postId: string, data: Partial<Post>, authorId: stri
     })
     return result;
 }
-
 /* 
 user nijer post delete korte parbe and admin sobar post delete korte parbe
 */
@@ -238,9 +238,8 @@ const deletePost = async (postId: string, authorId: string, isAdmin: boolean) =>
 }
 
 
-
 const getStats = async () => {
-    // post count, published posts, draft post, total comments, total views
+    // post count, published posts, draft post, total comments, total views egulo dekte chai
     return await prisma.$transaction(async (prismatx) => {
         const [totalPosts, publishedPosts, draftPosts, archivedPosts, totalComments, approvedComment, rejectComment, totalUsers, adminCount, userCount, totalViews] = await Promise.all([
             await prismatx.post.count(),

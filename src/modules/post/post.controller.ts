@@ -1,10 +1,10 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { postServices } from "./post.service";
 import { PostStatus } from "../../../generated/prisma/enums";
 import paginatinSortingHelper from "../../helpers/paginationSortingHelper";
 import { UserRole } from "../../middlewares/auth";
 
-const createPost = async (req: Request, res: Response) => {
+const createPost = async (req: Request, res: Response, next: NextFunction) => {
     try {
         console.log(req.user);
         const user = req.user;
@@ -16,28 +16,22 @@ const createPost = async (req: Request, res: Response) => {
         const result = await postServices.createPost(req.body, user.id)
         res.status(201).json(result)
     } catch (e) {
-        res.status(400).json({
-            error: "failed to create post",
-            details: e
-        })
+        next(e)
     }
 }
 const getAllPost = async (req: Request, res: Response) => {
     try {
         const { search } = req.query
         const searchString = typeof search === 'string' ? search : undefined
+        // const searchString = req.query.search ? (req.query.search as string) : undefined
 
         const tags = req.query.tags ? (req.query.tags as string).split(",") : [];
 
         const isFeatured = req.query.isFeatured
-            ? req.query.isFeatured === 'true'
-                ? true
-                : req.query.isFeatured === 'false'
-                    ? false
-                    : undefined
+            ? req.query.isFeatured === 'true' ? true : req.query.isFeatured === 'false' ? false : undefined  // true and false er banan vul kora jabe na tai ei line ta disi
             : undefined
 
-        const status = req.query.status as PostStatus | undefined
+        const status = req.query.status as PostStatus | undefined  // PostStatus name e enum type banay raksi skima.prisma te
 
         const authorId = req.query.authorId as string | undefined
 
@@ -64,7 +58,6 @@ const getAllPost = async (req: Request, res: Response) => {
 const getPostById = async (req: Request, res: Response) => {
     try {
         const { postId } = req.params;
-
         if (!postId || typeof postId !== "string") {
             throw new Error("Post Id is required!")
         }
@@ -94,7 +87,7 @@ const getMyPosts = async (req: Request, res: Response) => {
         })
     }
 }
-const updateMyPosts = async (req: Request, res: Response) => {
+const updateMyPosts = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const user = req.user;
         if (!user) {
@@ -105,11 +98,7 @@ const updateMyPosts = async (req: Request, res: Response) => {
         const result = await postServices.updateMyPosts(postId as string, req.body, user.id, isAdmin);
         res.status(200).json(result)
     } catch (e) {
-        const errorMessage = (e instanceof Error) ? e.message : "post update failed";
-        res.status(400).json({
-            error: errorMessage,
-            details: e
-        })
+        next(e)
     }
 }
 const deletePosts = async (req: Request, res: Response) => {

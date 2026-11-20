@@ -7,7 +7,7 @@ const createComment = async (payload: {
     postId: string;
     parentId?: string
 }) => {
-    await prisma.post.findFirstOrThrow({
+    await prisma.post.findUniqueOrThrow({
         where: {
             id: payload.postId
         }
@@ -24,8 +24,7 @@ const createComment = async (payload: {
     })
     return result
 }
-
-const getCommentById = async (id: string) => {  //! id or commentId j kono name e receive kora jay mone rakbo
+const getCommentById = async (id: string) => {  //! id or commentId j kono name e receive kora jay jodio controller e alada name takte pare
     return await prisma.comment.findUnique({
         where: {
             id
@@ -34,13 +33,13 @@ const getCommentById = async (id: string) => {  //! id or commentId j kono name 
             post: {
                 select: {
                     id: true,
-                    title: true
+                    title: true,
+                    views: true
                 }
             }
         }
     })
 }
-
 const getCommentByAuthor = async (authorId: string) => {
     return await prisma.comment.findMany({
         where: {
@@ -57,7 +56,7 @@ const getCommentByAuthor = async (authorId: string) => {
         }
     })
 }
-
+//! nijer comment delete korte parbe (login thakte hobe) & nijer comment ki na check korte hobe
 const deleteComment = async (commentId: string, authorId: string) => {
     const commentData = await prisma.comment.findFirst({
         where: {
@@ -99,7 +98,7 @@ const updateComment = async (commentId: string, data: { content?: string, status
         data
     })
 }
-
+//! only admin kono post approve or reject kore dite parbe
 const moderateComment = async (id: string, data: { status: CommentStatus }) => {
     // console.log("moderate comment here", { id, data });
     const commentData = await prisma.comment.findUniqueOrThrow({
@@ -111,6 +110,7 @@ const moderateComment = async (id: string, data: { status: CommentStatus }) => {
             status: true
         }
     });
+    // approve or reject korar somoy already thakle (same status hoile) abar update korbo na 
     if (commentData.status === data.status) {
         throw new Error(`Your provided status (${data.status}) is already up to date`)
     }

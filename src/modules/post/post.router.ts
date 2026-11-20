@@ -6,17 +6,17 @@ const router = express.Router();
 
 router.get("/", PostController.getAllPost)
 
-router.get("/stats", auth(UserRole.ADMIN), PostController.getStats)
+router.get("/:postId", PostController.getPostById)
 
 router.get("/my-posts", auth(UserRole.USER, UserRole.ADMIN), PostController.getMyPosts)
-
-router.get("/:postId", PostController.getPostById)
 
 router.post("/", auth(UserRole.USER, UserRole.ADMIN), PostController.createPost)
 
 router.patch("/:postId", auth(UserRole.USER, UserRole.ADMIN), PostController.updateMyPosts)
 
 router.delete("/:postId", auth(UserRole.USER, UserRole.ADMIN), PostController.deletePosts)
+
+router.get("/stats", auth(UserRole.ADMIN), PostController.getStats)
 
 
 
